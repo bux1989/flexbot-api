@@ -5,13 +5,6 @@ from datetime import datetime, timedelta
 
 ai_bp = Blueprint('ai', __name__)
 
-def get_api_key():
-    api_key = request.headers.get("X-Todoist-Api-Key")
-    if not api_key:
-        data = request.get_json(silent=True) or {}
-        api_key = data.get("api_key")
-    return api_key
-
 @ai_bp.route("/auto-prioritize", methods=["POST"])
 def auto_prioritize():
     data = request.get_json()
@@ -68,14 +61,11 @@ def suggest_labels_or_sections():
 
 @ai_bp.route("/summarize-project", methods=["POST"])
 def summarize_project():
-    api_key = get_api_key()
-    if not api_key:
-        return jsonify({"error": "API key required"}), 401
     data = request.get_json()
     project_id = data.get("project_id")
     if not project_id:
         return jsonify({"error": "project_id required"}), 400
-    tasks_resp = requests.get(f"https://api.todoist.com/rest/v2/tasks?project_id={project_id}", headers=get_headers(api_key))
+    tasks_resp = requests.get(f"https://api.todoist.com/rest/v2/tasks?project_id={project_id}", headers=get_headers())
     tasks = tasks_resp.json()
     summary = {
         "total": len(tasks),
@@ -87,10 +77,7 @@ def summarize_project():
 
 @ai_bp.route("/get-blocked-tasks", methods=["GET"])
 def get_blocked_tasks():
-    api_key = get_api_key()
-    if not api_key:
-        return jsonify({"error": "API key required"}), 401
-    resp = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers(api_key))
+    resp = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers())
     tasks = resp.json()
     blocked = [t for t in tasks if 'blocked' in [lbl.lower() for lbl in t.get('labels', [])]]
     return jsonify(blocked)
