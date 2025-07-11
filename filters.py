@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from utils import get_headers
-from cache import cache_clear
+from cache import cache_get, cache_set, cache_clear  # <-- Import caching functions
 import requests
 from datetime import datetime, timedelta
 
@@ -20,6 +20,13 @@ def get_tasks_by_filter():
         return jsonify({"error": "API key required"}), 401
     data = request.get_json()
     filter_type = data.get("filter")
+
+    # Add caching (cache is per user and per filter)
+    cache_key = f"filtered_tasks_{api_key}_{filter_type}"
+    cached = cache_get(cache_key)
+    if cached:
+        return jsonify(cached)
+
     resp = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers(api_key))
     all_tasks = resp.json()
     today = datetime.utcnow().date()
@@ -32,6 +39,8 @@ def get_tasks_by_filter():
             continue
         if filter_type == "this_week" and (0 <= (due_date - today).days < 7):
             filtered.append(task)
+
+    cache_set(cache_key, filtered, ttl=60)  # Cache result for 60 seconds
     return jsonify(filtered)
 
 @filters_bp.route("/reschedule-by-label", methods=["POST"])
