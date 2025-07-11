@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from utils import get_headers
-from cache import cache_get, cache_set, cache_clear  # <-- Import caching functions
+from cache import cache_get, cache_set, cache_clear
 import requests
 from datetime import datetime, timedelta
 
@@ -28,16 +28,19 @@ def get_tasks_by_filter():
         return jsonify(cached)
 
     resp = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers(api_key))
-    all_tasks = resp.json()
+    try:
+        all_tasks = resp.json()
+    except Exception:
+        return jsonify({"error": "Failed to fetch tasks"}), resp.status_code
     today = datetime.utcnow().date()
     filtered = []
     for task in all_tasks:
         due = task.get("due", {}).get("date")
         try:
-            due_date = datetime.fromisoformat(due).date()
+            due_date = datetime.fromisoformat(due).date() if due else None
         except Exception:
             continue
-        if filter_type == "this_week" and (0 <= (due_date - today).days < 7):
+        if filter_type == "this_week" and due_date and (0 <= (due_date - today).days < 7):
             filtered.append(task)
 
     cache_set(cache_key, filtered, ttl=60)  # Cache result for 60 seconds
@@ -54,10 +57,14 @@ def reschedule_by_label():
     if not label or not new_due:
         return jsonify({"error": "label and due_string required"}), 400
     resp = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers(api_key))
-    tasks = resp.json()
+    try:
+        tasks = resp.json()
+    except Exception:
+        return jsonify({"error": "Failed to fetch tasks"}), resp.status_code
     updated = []
     for task in tasks:
-        if label in [lbl.lower() for lbl in task.get("labels", [])]:
+        labels = [lbl.lower() for lbl in task.get("labels", [])]
+        if label.lower() in labels:
             task_id = task["id"]
             patch_data = {"due_string": new_due}
             edit_resp = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=patch_data, headers=get_headers(api_key))
@@ -70,13 +77,16 @@ def rollover_overdue():
     if not api_key:
         return jsonify({"error": "API key required"}), 401
     resp = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers(api_key))
-    tasks = resp.json()
+    try:
+        tasks = resp.json()
+    except Exception:
+        return jsonify({"error": "Failed to fetch tasks"}), resp.status_code
     today = datetime.utcnow().date()
     updated = []
     for task in tasks:
         due = task.get("due", {}).get("date")
         try:
-            due_date = datetime.fromisoformat(due).date()
+            due_date = datetime.fromisoformat(due).date() if due else None
         except Exception:
             continue
         if due_date and due_date < today:
@@ -88,7 +98,7 @@ def rollover_overdue():
 @filters_bp.route("/archive-completed", methods=["POST"])
 def archive_completed():
     # Todoist handles archiving automatically; nothing to do.
-    return jsonify({"status": "Todoist handles archiving automatically."})
+    return jsonify({"status": "Todoist handles archiving completed tasks automatically. No action required."})
 
 @filters_bp.route("/weekly-summary", methods=["GET"])
 def weekly_summary():
@@ -97,7 +107,10 @@ def weekly_summary():
         return jsonify({"error": "API key required"}), 401
     week_ago = (datetime.utcnow() - timedelta(days=7)).date().isoformat()
     resp = requests.get("https://api.todoist.com/sync/v9/completed/get_all", headers=get_headers(api_key))
-    completed = resp.json()
+    try:
+        completed = resp.json()
+    except Exception:
+        return jsonify({"error": "Failed to fetch completed tasks"}), resp.status_code
     summary = [t for t in completed.get("items", []) if t.get("completed_date", "").split("T")[0] >= week_ago]
     return jsonify(summary)
 
