@@ -1,25 +1,28 @@
-import os
+import requests
 
-# Get Todoist API key from environment variable
-TODOIST_API_KEY = os.getenv("TODOIST_API_KEY")
-if not TODOIST_API_KEY:
-    raise ValueError("TODOIST_API_KEY environment variable not set.")
+def get_headers(api_key):
+    """
+    Returns headers for Todoist API requests, using the user-supplied API key.
+    """
+    if not api_key:
+        raise ValueError("No Todoist API key provided.")
+    return {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
 
-HEADERS = {
-    "Authorization": f"Bearer {TODOIST_API_KEY}",
-    "Content-Type": "application/json"
-}
-
-# --- Add any helper functions here ---
-
-def get_all_tasks():
-    """Return all active Todoist tasks."""
-    import requests
-    resp = requests.get("https://api.todoist.com/rest/v2/tasks", headers=HEADERS)
+def get_all_tasks(api_key):
+    """
+    Fetch all active Todoist tasks for the provided API key.
+    """
+    headers = get_headers(api_key)
+    resp = requests.get("https://api.todoist.com/rest/v2/tasks", headers=headers)
     return resp.json()
 
-def get_completed_tasks():
-    """Return all completed Todoist tasks."""
-    import requests
-    resp = requests.get("https://api.todoist.com/sync/v9/completed/get_all", headers=HEADERS)
+def get_completed_tasks(api_key):
+    """
+    Fetch all completed Todoist tasks for the provided API key.
+    """
+    headers = get_headers(api_key)
+    resp = requests.get("https://api.todoist.com/sync/v9/completed/get_all", headers=headers)
     return resp.json()
