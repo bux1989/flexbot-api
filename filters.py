@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from utils import get_headers
+from cache import cache_clear
 import requests
 from datetime import datetime, timedelta
 
@@ -90,3 +91,8 @@ def weekly_summary():
     completed = resp.json()
     summary = [t for t in completed.get("items", []) if t.get("completed_date", "").split("T")[0] >= week_ago]
     return jsonify(summary)
+
+@filters_bp.route("/flush-cache", methods=["GET"])
+def flush_cache():
+    cache_clear()
+    return jsonify({"status": "cache flushed"})
