@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from utils import get_headers
-from cache import cache_get, cache_set  # <-- Import caching functions
+from cache import cache_get, cache_set
 import requests
 
 tasks_bp = Blueprint('tasks', __name__)
@@ -11,6 +11,16 @@ def get_api_key():
         data = request.get_json(silent=True) or {}
         api_key = data.get("api_key")
     return api_key
+
+def safe_json_response(response):
+    # Safely handle empty or invalid JSON responses
+    if response.content:
+        try:
+            return jsonify(response.json()), response.status_code
+        except Exception:
+            return jsonify({"message": response.text or "No response content", "status_code": response.status_code}), response.status_code
+    else:
+        return jsonify({"message": "No response content", "status_code": response.status_code}), response.status_code
 
 @tasks_bp.route("/create-task", methods=["POST"])
 def create_task():
@@ -27,7 +37,7 @@ def create_task():
     }
     task_data = {k: v for k, v in task_data.items() if v}
     response = requests.post("https://api.todoist.com/rest/v2/tasks", json=task_data, headers=get_headers(api_key))
-    return jsonify(response.json()), response.status_code
+    return safe_json_response(response)
 
 @tasks_bp.route("/edit-task", methods=["POST"])
 def edit_task():
@@ -40,7 +50,7 @@ def edit_task():
         return jsonify({"error": "task_id required"}), 400
     task_data = {k: v for k, v in data.items() if k in {"title", "priority", "due_string"}}
     response = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=task_data, headers=get_headers(api_key))
-    return jsonify(response.json()), response.status_code
+    return safe_json_response(response)
 
 @tasks_bp.route("/complete-task", methods=["POST"])
 def complete_task():
@@ -52,7 +62,7 @@ def complete_task():
     if not task_id:
         return jsonify({"error": "task_id required"}), 400
     response = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}/close", headers=get_headers(api_key))
-    return jsonify({"status": "completed"}), response.status_code
+    return safe_json_response(response)
 
 @tasks_bp.route("/delete-task", methods=["POST"])
 def delete_task():
@@ -64,7 +74,7 @@ def delete_task():
     if not task_id:
         return jsonify({"error": "task_id required"}), 400
     response = requests.delete(f"https://api.todoist.com/rest/v2/tasks/{task_id}", headers=get_headers(api_key))
-    return jsonify({"status": "deleted"}), response.status_code
+    return safe_json_response(response)
 
 @tasks_bp.route("/list-tasks", methods=["GET"])
 def list_tasks():
@@ -77,7 +87,7 @@ def list_tasks():
         return jsonify(cached)
     response = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers(api_key))
     data = response.json()
-    cache_set(cache_key, data, ttl=60)  # Cache for 60 seconds (adjust as needed)
+    cache_set(cache_key, data, ttl=60)
     return jsonify(data), response.status_code
 
 @tasks_bp.route("/create-recurring-task", methods=["POST"])
@@ -91,7 +101,7 @@ def create_recurring_task():
         "due_string": data.get("due_string"),
     }
     response = requests.post("https://api.todoist.com/rest/v2/tasks", json=task_data, headers=get_headers(api_key))
-    return jsonify(response.json()), response.status_code
+    return safe_json_response(response)
 
 @tasks_bp.route("/move-task", methods=["POST"])
 def move_task():
@@ -110,7 +120,7 @@ def move_task():
     if section_id:
         update_data["section_id"] = section_id
     response = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=update_data, headers=get_headers(api_key))
-    return jsonify(response.json()), response.status_code
+    return safe_json_response(response)
 
 @tasks_bp.route("/duplicate-task", methods=["POST"])
 def duplicate_task():
@@ -128,7 +138,7 @@ def duplicate_task():
     new_task = {k: orig_task.get(k) for k in ["content", "priority", "due_string", "project_id", "section_id"] if orig_task.get(k)}
     new_task["content"] = f"Copy of: {orig_task['content']}"
     resp = requests.post("https://api.todoist.com/rest/v2/tasks", json=new_task, headers=get_headers(api_key))
-    return jsonify(resp.json()), resp.status_code
+    return safe_json_response(resp)
 
 @tasks_bp.route("/bulk-edit-tasks", methods=["POST"])
 def bulk_edit_tasks():
@@ -141,5 +151,12 @@ def bulk_edit_tasks():
     results = []
     for task_id in task_ids:
         resp = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=update_fields, headers=get_headers(api_key))
-        results.append({"task_id": task_id, "result": resp.json(), "status": resp.status_code})
+        if resp.content:
+            try:
+                result = resp.json()
+            except Exception:
+                result = {"message": resp.text or "No response content"}
+        else:
+            result = {"message": "No response content"}
+        results.append({"task_id": task_id, "result": result, "status": resp.status_code})
     return jsonify(results)
