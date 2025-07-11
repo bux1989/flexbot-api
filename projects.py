@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from utils import get_headers
-from cache import cache_get, cache_set  # <-- Import caching functions
+from cache import cache_get, cache_set
 import requests
 
 projects_bp = Blueprint('projects', __name__)
@@ -22,7 +22,10 @@ def list_projects():
     if cached:
         return jsonify(cached)
     resp = requests.get("https://api.todoist.com/rest/v2/projects", headers=get_headers(api_key))
-    data = resp.json()
+    try:
+        data = resp.json()
+    except Exception:
+        return jsonify({"error": "Invalid response from Todoist", "details": resp.text}), resp.status_code
     cache_set(cache_key, data, ttl=60)  # Cache for 60 seconds
     return jsonify(data), resp.status_code
 
@@ -39,7 +42,10 @@ def create_project():
     }
     project_data = {k: v for k, v in project_data.items() if v is not None}
     resp = requests.post("https://api.todoist.com/rest/v2/projects", json=project_data, headers=get_headers(api_key))
-    return jsonify(resp.json()), resp.status_code
+    try:
+        return jsonify(resp.json()), resp.status_code
+    except Exception:
+        return jsonify({"error": "Invalid response from Todoist", "details": resp.text}), resp.status_code
 
 @projects_bp.route("/edit-project", methods=["POST"])
 def edit_project():
@@ -56,7 +62,10 @@ def edit_project():
     }
     update_data = {k: v for k, v in update_data.items() if v is not None}
     resp = requests.post(f"https://api.todoist.com/rest/v2/projects/{project_id}", json=update_data, headers=get_headers(api_key))
-    return jsonify(resp.json()), resp.status_code
+    try:
+        return jsonify(resp.json()), resp.status_code
+    except Exception:
+        return jsonify({"error": "Invalid response from Todoist", "details": resp.text}), resp.status_code
 
 @projects_bp.route("/delete-project", methods=["POST"])
 def delete_project():
@@ -68,4 +77,7 @@ def delete_project():
     if not project_id:
         return jsonify({"error": "project_id required"}), 400
     resp = requests.delete(f"https://api.todoist.com/rest/v2/projects/{project_id}", headers=get_headers(api_key))
-    return jsonify({"status": "deleted"}), resp.status_code
+    if resp.status_code == 204:
+        return jsonify({"status": "deleted"}), 204
+    else:
+        return jsonify({"error": "Failed to delete project", "details": resp.text}), resp.status_code
