@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: flexbot-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: TODOIST_API_KEY
+        sync: false
