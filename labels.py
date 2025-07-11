@@ -18,7 +18,10 @@ def list_labels():
     if not api_key:
         return jsonify({"error": "API key required"}), 401
     resp = requests.get("https://api.todoist.com/rest/v2/labels", headers=get_headers(api_key))
-    return jsonify(resp.json()), resp.status_code
+    try:
+        return jsonify(resp.json()), resp.status_code
+    except Exception:
+        return jsonify({"error": "Invalid response from Todoist", "details": resp.text}), resp.status_code
 
 @labels_bp.route("/create-label", methods=["POST"])
 def create_label():
@@ -33,7 +36,10 @@ def create_label():
     }
     label_data = {k: v for k, v in label_data.items() if v is not None}
     resp = requests.post("https://api.todoist.com/rest/v2/labels", json=label_data, headers=get_headers(api_key))
-    return jsonify(resp.json()), resp.status_code
+    try:
+        return jsonify(resp.json()), resp.status_code
+    except Exception:
+        return jsonify({"error": "Invalid response from Todoist", "details": resp.text}), resp.status_code
 
 @labels_bp.route("/edit-label", methods=["POST"])
 def edit_label():
@@ -51,7 +57,10 @@ def edit_label():
     }
     update_data = {k: v for k, v in update_data.items() if v is not None}
     resp = requests.post(f"https://api.todoist.com/rest/v2/labels/{label_id}", json=update_data, headers=get_headers(api_key))
-    return jsonify(resp.json()), resp.status_code
+    try:
+        return jsonify(resp.json()), resp.status_code
+    except Exception:
+        return jsonify({"error": "Invalid response from Todoist", "details": resp.text}), resp.status_code
 
 @labels_bp.route("/delete-label", methods=["POST"])
 def delete_label():
@@ -63,7 +72,10 @@ def delete_label():
     if not label_id:
         return jsonify({"error": "label_id required"}), 400
     resp = requests.delete(f"https://api.todoist.com/rest/v2/labels/{label_id}", headers=get_headers(api_key))
-    return jsonify({"status": "deleted"}), resp.status_code
+    if resp.status_code == 204:
+        return jsonify({"status": "deleted"}), 204
+    else:
+        return jsonify({"error": "Failed to delete label", "details": resp.text}), resp.status_code
 
 @labels_bp.route("/assign-labels", methods=["POST"])
 def assign_labels():
@@ -88,6 +100,7 @@ def assign_labels():
         ]
     }
     resp = requests.post("https://api.todoist.com/sync/v9/sync", json=payload, headers=get_headers(api_key))
-    if resp.status_code != 200:
+    try:
+        return jsonify({"status": "Labels assigned", "response": resp.json()}), resp.status_code
+    except Exception:
         return jsonify({"error": "Failed to assign labels", "details": resp.text}), resp.status_code
-    return jsonify({"status": "Labels assigned", "response": resp.json()}), 200
