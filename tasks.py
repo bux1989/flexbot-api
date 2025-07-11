@@ -1,11 +1,11 @@
 from flask import Blueprint, request, jsonify
 from utils import get_headers
+from cache import cache_get, cache_set  # <-- Import caching functions
 import requests
 
 tasks_bp = Blueprint('tasks', __name__)
 
 def get_api_key():
-    """Try to get API key from header first, then body."""
     api_key = request.headers.get("X-Todoist-Api-Key")
     if not api_key:
         data = request.get_json(silent=True) or {}
@@ -71,8 +71,14 @@ def list_tasks():
     api_key = get_api_key()
     if not api_key:
         return jsonify({"error": "API key required"}), 401
+    cache_key = f"tasks_{api_key}"
+    cached = cache_get(cache_key)
+    if cached:
+        return jsonify(cached)
     response = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers(api_key))
-    return jsonify(response.json()), response.status_code
+    data = response.json()
+    cache_set(cache_key, data, ttl=60)  # Cache for 60 seconds (adjust as needed)
+    return jsonify(data), response.status_code
 
 @tasks_bp.route("/create-recurring-task", methods=["POST"])
 def create_recurring_task():
