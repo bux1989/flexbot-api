@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from utils import get_headers
+from cache import cache_get, cache_set  # <-- Import caching functions
 import requests
 
 projects_bp = Blueprint('projects', __name__)
@@ -16,8 +17,14 @@ def list_projects():
     api_key = get_api_key()
     if not api_key:
         return jsonify({"error": "API key required"}), 401
+    cache_key = f"projects_{api_key}"
+    cached = cache_get(cache_key)
+    if cached:
+        return jsonify(cached)
     resp = requests.get("https://api.todoist.com/rest/v2/projects", headers=get_headers(api_key))
-    return jsonify(resp.json()), resp.status_code
+    data = resp.json()
+    cache_set(cache_key, data, ttl=60)  # Cache for 60 seconds
+    return jsonify(data), resp.status_code
 
 @projects_bp.route("/create-project", methods=["POST"])
 def create_project():
