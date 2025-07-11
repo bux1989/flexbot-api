@@ -1,0 +1,38 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Environment variables and secrets
+.env
+*.env
+
+# Virtual environment folders
+venv/
+env/
+.venv/
+ENV/
+
+# macOS junk
+.DS_Store
+
+# VSCode and IDE folders
+.vscode/
+.idea/
+
+# Test and coverage outputs
+.coverage
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+
+# Logs
+*.log
+
+# Other
+*.sqlite3
+*.db

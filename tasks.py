@@ -1,0 +1,145 @@
+from flask import Blueprint, request, jsonify
+from utils import get_headers
+from cache import cache_get, cache_set  # <-- Import caching functions
+import requests
+
+tasks_bp = Blueprint('tasks', __name__)
+
+def get_api_key():
+    api_key = request.headers.get("X-Todoist-Api-Key")
+    if not api_key:
+        data = request.get_json(silent=True) or {}
+        api_key = data.get("api_key")
+    return api_key
+
+@tasks_bp.route("/create-task", methods=["POST"])
+def create_task():
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({"error": "API key required"}), 401
+    data = request.get_json()
+    task_data = {
+        "content": data.get("title"),
+        "priority": data.get("priority", 1),
+        "due_string": data.get("due_string"),
+        "project_id": data.get("project_id"),
+        "section_id": data.get("section_id")
+    }
+    task_data = {k: v for k, v in task_data.items() if v}
+    response = requests.post("https://api.todoist.com/rest/v2/tasks", json=task_data, headers=get_headers(api_key))
+    return jsonify(response.json()), response.status_code
+
+@tasks_bp.route("/edit-task", methods=["POST"])
+def edit_task():
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({"error": "API key required"}), 401
+    data = request.get_json()
+    task_id = data.get("task_id")
+    if not task_id:
+        return jsonify({"error": "task_id required"}), 400
+    task_data = {k: v for k, v in data.items() if k in {"title", "priority", "due_string"}}
+    response = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=task_data, headers=get_headers(api_key))
+    return jsonify(response.json()), response.status_code
+
+@tasks_bp.route("/complete-task", methods=["POST"])
+def complete_task():
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({"error": "API key required"}), 401
+    data = request.get_json()
+    task_id = data.get("task_id")
+    if not task_id:
+        return jsonify({"error": "task_id required"}), 400
+    response = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}/close", headers=get_headers(api_key))
+    return jsonify({"status": "completed"}), response.status_code
+
+@tasks_bp.route("/delete-task", methods=["POST"])
+def delete_task():
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({"error": "API key required"}), 401
+    data = request.get_json()
+    task_id = data.get("task_id")
+    if not task_id:
+        return jsonify({"error": "task_id required"}), 400
+    response = requests.delete(f"https://api.todoist.com/rest/v2/tasks/{task_id}", headers=get_headers(api_key))
+    return jsonify({"status": "deleted"}), response.status_code
+
+@tasks_bp.route("/list-tasks", methods=["GET"])
+def list_tasks():
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({"error": "API key required"}), 401
+    cache_key = f"tasks_{api_key}"
+    cached = cache_get(cache_key)
+    if cached:
+        return jsonify(cached)
+    response = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers(api_key))
+    data = response.json()
+    cache_set(cache_key, data, ttl=60)  # Cache for 60 seconds (adjust as needed)
+    return jsonify(data), response.status_code
+
+@tasks_bp.route("/create-recurring-task", methods=["POST"])
+def create_recurring_task():
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({"error": "API key required"}), 401
+    data = request.get_json()
+    task_data = {
+        "content": data.get("title"),
+        "due_string": data.get("due_string"),
+    }
+    response = requests.post("https://api.todoist.com/rest/v2/tasks", json=task_data, headers=get_headers(api_key))
+    return jsonify(response.json()), response.status_code
+
+@tasks_bp.route("/move-task", methods=["POST"])
+def move_task():
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({"error": "API key required"}), 401
+    data = request.get_json()
+    task_id = data.get("task_id")
+    project_id = data.get("project_id")
+    section_id = data.get("section_id")
+    if not task_id:
+        return jsonify({"error": "task_id required"}), 400
+    update_data = {}
+    if project_id:
+        update_data["project_id"] = project_id
+    if section_id:
+        update_data["section_id"] = section_id
+    response = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=update_data, headers=get_headers(api_key))
+    return jsonify(response.json()), response.status_code
+
+@tasks_bp.route("/duplicate-task", methods=["POST"])
+def duplicate_task():
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({"error": "API key required"}), 401
+    data = request.get_json()
+    task_id = data.get("task_id")
+    if not task_id:
+        return jsonify({"error": "task_id required"}), 400
+    orig_task_resp = requests.get(f"https://api.todoist.com/rest/v2/tasks/{task_id}", headers=get_headers(api_key))
+    if orig_task_resp.status_code != 200:
+        return jsonify({"error": "Original task not found"}), 404
+    orig_task = orig_task_resp.json()
+    new_task = {k: orig_task.get(k) for k in ["content", "priority", "due_string", "project_id", "section_id"] if orig_task.get(k)}
+    new_task["content"] = f"Copy of: {orig_task['content']}"
+    resp = requests.post("https://api.todoist.com/rest/v2/tasks", json=new_task, headers=get_headers(api_key))
+    return jsonify(resp.json()), resp.status_code
+
+@tasks_bp.route("/bulk-edit-tasks", methods=["POST"])
+def bulk_edit_tasks():
+    api_key = get_api_key()
+    if not api_key:
+        return jsonify({"error": "API key required"}), 401
+    data = request.get_json()
+    task_ids = data.get("task_ids", [])
+    update_fields = data.get("fields", {})
+    results = []
+    for task_id in task_ids:
+        resp = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=update_fields, headers=get_headers(api_key))
+        results.append({"task_id": task_id, "result": resp.json(), "status": resp.status_code})
+    return jsonify(results)
