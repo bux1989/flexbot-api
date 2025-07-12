@@ -4,18 +4,8 @@ import requests
 
 collab_bp = Blueprint('collab', __name__)
 
-def get_api_key():
-    api_key = request.headers.get("X-Todoist-Api-Key")
-    if not api_key:
-        data = request.get_json(silent=True) or {}
-        api_key = data.get("api_key")
-    return api_key
-
 @collab_bp.route("/assign-tasks-to-role", methods=["POST"])
 def assign_tasks_to_role():
-    api_key = get_api_key()
-    if not api_key:
-        return jsonify({"error": "API key required"}), 401
     data = request.get_json()
     task_ids = data.get("task_ids")
     role = data.get("role")
@@ -27,7 +17,7 @@ def assign_tasks_to_role():
         resp = requests.post(
             f"https://api.todoist.com/rest/v2/tasks/{task_id}",
             json={"responsible_uid": assignee_id},
-            headers=get_headers(api_key)
+            headers=get_headers()  # <-- No api_key argument, always uses ENV
         )
         try:
             result = resp.json()
@@ -38,9 +28,6 @@ def assign_tasks_to_role():
 
 @collab_bp.route("/mention-alerts", methods=["POST"])
 def mention_alerts():
-    api_key = get_api_key()
-    if not api_key:
-        return jsonify({"error": "API key required"}), 401
     data = request.get_json()
     task_id = data.get("task_id")
     user_id = data.get("user_id")
@@ -53,7 +40,7 @@ def mention_alerts():
     resp = requests.post(
         "https://api.todoist.com/rest/v2/comments",
         json=comment_data,
-        headers=get_headers(api_key)
+        headers=get_headers()
     )
     try:
         result = resp.json()
