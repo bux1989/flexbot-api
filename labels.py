@@ -5,29 +5,22 @@ import uuid
 
 labels_bp = Blueprint('labels', __name__)
 
-def get_api_key():
-    api_key = request.headers.get("X-Todoist-Api-Key")
-    if not api_key:
-        data = request.get_json(silent=True) or {}
-        api_key = data.get("api_key")
-    return api_key
+def safe_json_response(response):
+    if response.content:
+        try:
+            return jsonify(response.json()), response.status_code
+        except Exception:
+            return jsonify({"error": "Invalid response from Todoist", "details": response.text}), response.status_code
+    else:
+        return jsonify({"message": "No response content", "status_code": response.status_code}), response.status_code
 
 @labels_bp.route("/list-labels", methods=["GET"])
 def list_labels():
-    api_key = get_api_key()
-    if not api_key:
-        return jsonify({"error": "API key required"}), 401
-    resp = requests.get("https://api.todoist.com/rest/v2/labels", headers=get_headers(api_key))
-    try:
-        return jsonify(resp.json()), resp.status_code
-    except Exception:
-        return jsonify({"error": "Invalid response from Todoist", "details": resp.text}), resp.status_code
+    resp = requests.get("https://api.todoist.com/rest/v2/labels", headers=get_headers())
+    return safe_json_response(resp)
 
 @labels_bp.route("/create-label", methods=["POST"])
 def create_label():
-    api_key = get_api_key()
-    if not api_key:
-        return jsonify({"error": "API key required"}), 401
     data = request.get_json()
     label_data = {
         "name": data.get("name"),
@@ -35,17 +28,11 @@ def create_label():
         "favorite": data.get("favorite", False)
     }
     label_data = {k: v for k, v in label_data.items() if v is not None}
-    resp = requests.post("https://api.todoist.com/rest/v2/labels", json=label_data, headers=get_headers(api_key))
-    try:
-        return jsonify(resp.json()), resp.status_code
-    except Exception:
-        return jsonify({"error": "Invalid response from Todoist", "details": resp.text}), resp.status_code
+    resp = requests.post("https://api.todoist.com/rest/v2/labels", json=label_data, headers=get_headers())
+    return safe_json_response(resp)
 
 @labels_bp.route("/edit-label", methods=["POST"])
 def edit_label():
-    api_key = get_api_key()
-    if not api_key:
-        return jsonify({"error": "API key required"}), 401
     data = request.get_json()
     label_id = data.get("label_id")
     if not label_id:
@@ -56,22 +43,16 @@ def edit_label():
         "favorite": data.get("favorite")
     }
     update_data = {k: v for k, v in update_data.items() if v is not None}
-    resp = requests.post(f"https://api.todoist.com/rest/v2/labels/{label_id}", json=update_data, headers=get_headers(api_key))
-    try:
-        return jsonify(resp.json()), resp.status_code
-    except Exception:
-        return jsonify({"error": "Invalid response from Todoist", "details": resp.text}), resp.status_code
+    resp = requests.post(f"https://api.todoist.com/rest/v2/labels/{label_id}", json=update_data, headers=get_headers())
+    return safe_json_response(resp)
 
 @labels_bp.route("/delete-label", methods=["POST"])
 def delete_label():
-    api_key = get_api_key()
-    if not api_key:
-        return jsonify({"error": "API key required"}), 401
     data = request.get_json()
     label_id = data.get("label_id")
     if not label_id:
         return jsonify({"error": "label_id required"}), 400
-    resp = requests.delete(f"https://api.todoist.com/rest/v2/labels/{label_id}", headers=get_headers(api_key))
+    resp = requests.delete(f"https://api.todoist.com/rest/v2/labels/{label_id}", headers=get_headers())
     if resp.status_code == 204:
         return jsonify({"status": "deleted"}), 204
     else:
@@ -79,9 +60,6 @@ def delete_label():
 
 @labels_bp.route("/assign-labels", methods=["POST"])
 def assign_labels():
-    api_key = get_api_key()
-    if not api_key:
-        return jsonify({"error": "API key required"}), 401
     data = request.get_json()
     task_id = data.get("task_id")
     label_ids = data.get("label_ids")
@@ -99,8 +77,5 @@ def assign_labels():
             }
         ]
     }
-    resp = requests.post("https://api.todoist.com/sync/v9/sync", json=payload, headers=get_headers(api_key))
-    try:
-        return jsonify({"status": "Labels assigned", "response": resp.json()}), resp.status_code
-    except Exception:
-        return jsonify({"error": "Failed to assign labels", "details": resp.text}), resp.status_code
+    resp = requests.post("https://api.todoist.com/sync/v9/sync", json=payload, headers=get_headers())
+    return safe_json_response(resp)
