@@ -192,21 +192,40 @@ def bulk_edit_tasks():
     task_ids = data.get("task_ids", [])
     update_fields = data.get("fields", {})
 
-    # Only allow updating fields that Todoist supports
-    allowed_fields = {"title": "content", "priority": "priority", "due_string": "due_string"}
-    update_data = {api_field: update_fields[field] for field, api_field in allowed_fields.items() if update_fields.get(field) is not None}
+    valid_fields = {
+        "title": "content", "description": "description",
+        "labels": "label_ids", "priority": "priority",
+        "due_string": "due_string", "due_date": "due_date",
+        "due_datetime": "due_datetime", "due_lang": "due_lang",
+        "assignee_id": "assignee_id", "duration": "duration",
+        "duration_unit": "duration_unit", "deadline_date": "deadline_date",
+        "deadline_lang": "deadline_lang"
+    }
+    update_data = {
+        v: update_fields[k]
+        for k, v in valid_fields.items()
+        if update_fields.get(k) is not None
+    }
     if not update_data:
         return jsonify({"error": "No valid fields to update"}), 400
 
     results = []
     for task_id in task_ids:
-        resp = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=update_data, headers=get_headers())
+        resp = requests.post(
+            f"https://api.todoist.com/rest/v2/tasks/{task_id}",
+            json=update_data,
+            headers=get_headers()
+        )
+        result = None
         if resp.content:
             try:
                 result = resp.json()
             except Exception:
                 result = {"message": resp.text or "No response content"}
-        else:
-            result = {"message": "No response content"}
-        results.append({"task_id": task_id, "result": result, "status": resp.status_code})
+        results.append({
+            "task_id": task_id,
+            "result": result,
+            "status": resp.status_code
+        })
     return jsonify(results)
+
