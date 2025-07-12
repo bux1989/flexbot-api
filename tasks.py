@@ -6,7 +6,7 @@ import requests
 tasks_bp = Blueprint('tasks', __name__)
 
 def safe_json_response(response):
-    # Safely handle empty or invalid JSON responses
+    """Safely handle empty or invalid JSON responses."""
     if response.content:
         try:
             return jsonify(response.json()), response.status_code
@@ -35,8 +35,15 @@ def edit_task():
     task_id = data.get("task_id")
     if not task_id:
         return jsonify({"error": "task_id required"}), 400
-    task_data = {k: v for k, v in data.items() if k in {"title", "priority", "due_string"}}
-    response = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=task_data, headers=get_headers())
+
+    # Only allow valid update fields for Todoist tasks
+    valid_fields = {"title": "content", "priority": "priority", "due_string": "due_string"}
+    update_data = {api_field: data[field] for field, api_field in valid_fields.items() if data.get(field) is not None}
+
+    if not update_data:
+        return jsonify({"error": "At least one updatable field required (title, priority, due_string)"}), 400
+
+    response = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=update_data, headers=get_headers())
     return safe_json_response(response)
 
 @tasks_bp.route("/complete-task", methods=["POST"])
@@ -86,11 +93,16 @@ def move_task():
     section_id = data.get("section_id")
     if not task_id:
         return jsonify({"error": "task_id required"}), 400
+
     update_data = {}
     if project_id:
         update_data["project_id"] = project_id
     if section_id:
         update_data["section_id"] = section_id
+
+    if not update_data:
+        return jsonify({"error": "At least one of project_id or section_id must be provided"}), 400
+
     response = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=update_data, headers=get_headers())
     return safe_json_response(response)
 
@@ -100,6 +112,7 @@ def duplicate_task():
     task_id = data.get("task_id")
     if not task_id:
         return jsonify({"error": "task_id required"}), 400
+
     orig_task_resp = requests.get(f"https://api.todoist.com/rest/v2/tasks/{task_id}", headers=get_headers())
     if orig_task_resp.status_code != 200:
         return jsonify({"error": "Original task not found"}), 404
@@ -114,9 +127,16 @@ def bulk_edit_tasks():
     data = request.get_json()
     task_ids = data.get("task_ids", [])
     update_fields = data.get("fields", {})
+
+    # Only allow updating fields that Todoist supports
+    allowed_fields = {"title": "content", "priority": "priority", "due_string": "due_string"}
+    update_data = {api_field: update_fields[field] for field, api_field in allowed_fields.items() if update_fields.get(field) is not None}
+    if not update_data:
+        return jsonify({"error": "No valid fields to update"}), 400
+
     results = []
     for task_id in task_ids:
-        resp = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=update_fields, headers=get_headers())
+        resp = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=update_data, headers=get_headers())
         if resp.content:
             try:
                 result = resp.json()
