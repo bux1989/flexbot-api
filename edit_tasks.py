@@ -7,7 +7,7 @@ import os
 load_dotenv()
 
 # Initialize the Todoist API
-api = TodoistAPI(os.getenv("TODOIST_API_TOKEN"))
+api = TodoistAPI(os.getenv("93327c7c386fff0c8c37fa3335369d7ec69b8dcc"))
 
 # Create a Blueprint for task editing -- THIS MUST BE DEFINED BEFORE ROUTES
 edit_tasks_bp = Blueprint('edit_tasks', __name__)
