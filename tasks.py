@@ -67,6 +67,8 @@ def delete_task():
 
 from datetime import datetime
 
+from datetime import datetime
+
 @tasks_bp.route("/list-tasks", methods=["GET"])
 def list_tasks():
     # Get the section_id, label, and due_date from query parameters
@@ -97,13 +99,11 @@ def list_tasks():
     
     # Filter tasks by due date if provided
     if due_date:
-        # Normalize the due date (e.g., 'today' or specific date 'YYYY-MM-DD')
         today = datetime.utcnow().date()
         if due_date.lower() == "today":
             data = [task for task in data if task.get("due", {}).get("date") == today.isoformat()]
         else:
             try:
-                # If the due_date is a specific date, compare it
                 due_date_parsed = datetime.strptime(due_date, "%Y-%m-%d").date()
                 data = [task for task in data if task.get("due", {}).get("date") == due_date_parsed.isoformat()]
             except ValueError:
