@@ -32,3 +32,9 @@ if __name__ == "__main__":
 # Print all registered URL rules
 for rule in app.url_map.iter_rules():
     print(rule)
+
+@app.route("/tasks/edit-task", methods=["PATCH", "POST", "GET"])
+def check_patch_method():
+    methods = request.method
+    print(f"Allowed Methods for /tasks/edit-task: {methods}")  # Print allowed methods
+    return jsonify({"message": "Method allowed!"}), 200
