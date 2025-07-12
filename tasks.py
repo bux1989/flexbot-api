@@ -67,37 +67,21 @@ def delete_task():
 
 from datetime import datetime
 
-from datetime import datetime
-
-from datetime import datetime
-
 @tasks_bp.route("/list-tasks", methods=["GET"])
 def list_tasks():
-    # Get the section_id, label, due_date, and project_id from query parameters
+    # Get the section_id, label, and due_date from query parameters
     section_id = request.args.get('section_id')  # e.g., ?section_id=196256877
     label = request.args.get('label')  # e.g., ?label=infoboard-element
     due_date = request.args.get('due_date')  # e.g., ?due_date=today, ?due_date=2025-07-14
-    project_name = request.args.get('project')  # e.g., ?project=Test Project
-    filter_string = request.args.get('filter')  # e.g., ?filter=project:Test Project
 
-    # Set cache key based on section, label, due date, and filter_string
-    cache_key = f"tasks_{section_id}_{label}_{due_date}_{project_name}_{filter_string}" if section_id or label or due_date or project_name or filter_string else "tasks"
+    # Set cache key based on section, label, and due date
+    cache_key = f"tasks_{section_id}_{label}_{due_date}" if section_id or label or due_date else "tasks"
     cached = cache_get(cache_key)
     if cached:
         return jsonify(cached)
 
-    # Construct the Todoist API request URL
-    api_url = "https://api.todoist.com/rest/v2/tasks"
-    
-    # Prepare the query parameters
-    params = {}
-    if filter_string:
-        params['filter'] = filter_string  # Pass the filter string for Todoist's filtering
-    if project_name:
-        params['filter'] = f"project:{project_name}"  # Or use project name filtering
-    
     # Fetch tasks from Todoist
-    response = requests.get(api_url, headers=get_headers(), params=params)
+    response = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers())
     try:
         data = response.json()
     except Exception as e:
@@ -113,11 +97,13 @@ def list_tasks():
     
     # Filter tasks by due date if provided
     if due_date:
+        # Normalize the due date (e.g., 'today' or specific date 'YYYY-MM-DD')
         today = datetime.utcnow().date()
         if due_date.lower() == "today":
             data = [task for task in data if task.get("due", {}).get("date") == today.isoformat()]
         else:
             try:
+                # If the due_date is a specific date, compare it
                 due_date_parsed = datetime.strptime(due_date, "%Y-%m-%d").date()
                 data = [task for task in data if task.get("due", {}).get("date") == due_date_parsed.isoformat()]
             except ValueError:
