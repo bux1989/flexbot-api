@@ -31,6 +31,7 @@ def create_task():
 
 @tasks_bp.route("/edit-task", methods=["POST", "PATCH"])
 def edit_task():
+    print("Edit-task hit! Method:", request.method)  # Log to debug deployment/method issues
     data = request.get_json()
     task_id = data.get("task_id")
     if not task_id:
@@ -54,12 +55,19 @@ def edit_task():
     if not update_data:
         return jsonify({"error": "At least one updatable field required (title, description, priority, due_string, labels)"}), 400
 
+    print("Update data to Todoist:", update_data)  # Log what's sent to Todoist
+
     response = requests.patch(
         f"https://api.todoist.com/rest/v2/tasks/{task_id}",
         json=update_data,
         headers=get_headers()
     )
     return safe_json_response(response)
+
+@tasks_bp.route("/patch-test", methods=["PATCH"])
+def patch_test():
+    print("patch-test hit! Method:", request.method)
+    return {"ok": True, "method": request.method}
     
 @tasks_bp.route("/complete-task", methods=["POST"])
 def complete_task():
