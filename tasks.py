@@ -49,7 +49,7 @@ def create_task():
     response = requests.post("https://api.todoist.com/rest/v2/tasks", json=task_data, headers=get_headers())
     return safe_json_response(response)
 
-@tasks_bp.route("/edit-task", methods=["POST"])
+@tasks_bp.route("/edit-task", methods=["POST", "PATCH"])
 def edit_task():
     data = request.get_json()
     task_id = data.get("task_id")
