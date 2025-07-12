@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Log blueprint registration
+# Log blueprint registration with optional URL prefix
 def log_and_register_blueprint(blueprint, url_prefix=None):
     if url_prefix:
         logger.info(f"Registering blueprint: {blueprint.name} at prefix: {url_prefix}")
@@ -26,6 +26,7 @@ def log_and_register_blueprint(blueprint, url_prefix=None):
         logger.info(f"Registering blueprint: {blueprint.name}")
         app.register_blueprint(blueprint)
 
+# Register all blueprints
 log_and_register_blueprint(tasks_bp)
 log_and_register_blueprint(projects_bp)
 log_and_register_blueprint(sections_bp)
@@ -34,6 +35,7 @@ log_and_register_blueprint(ai_bp)
 log_and_register_blueprint(filters_bp)
 log_and_register_blueprint(collab_bp)
 log_and_register_blueprint(webhook_bp)
+# NOTE: All edit-tasks endpoints will now be available at /tasks/*
 log_and_register_blueprint(edit_tasks_bp, url_prefix="/tasks")
 
 @app.route("/", methods=["GET"])
@@ -41,25 +43,25 @@ def index():
     logger.debug("Index route called")
     return {"status": "FlexBot Todoist API running."}
 
-# Log all URL rules for enhanced debugging
+# Log all registered URL rules for enhanced debugging
 def log_url_rules():
     logger.info("\n=== Registered URL Rules ===")
     for rule in app.url_map.iter_rules():
         logger.info(rule)
     logger.info("=== End of URL Rules ===\n")
 
-# Always log URL rules at startup, even with Gunicorn
+# Always log URL rules at startup
 with app.app_context():
     log_url_rules()
 
-# Optionally log every request (for extra debugging)
+# Log every request (for extra debugging)
 @app.before_request
 def log_request_info():
     logger.debug(f"Handling {request.method} request for {request.url}")
     logger.debug(f"Request headers: {dict(request.headers)}")
     logger.debug(f"Request body: {request.get_data()}")
 
-# Optionally log responses (for debugging responses)
+# Log responses (for debugging responses)
 @app.after_request
 def log_response_info(response):
     logger.debug(f"Response status: {response.status}")
