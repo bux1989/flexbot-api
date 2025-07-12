@@ -56,3 +56,23 @@ def delete_section():
         return jsonify({"status": "deleted"}), 200
     else:
         return jsonify({"error": "Failed to delete section", "details": resp.text}), resp.status_code
+
+@sections_bp.route("/get-sections", methods=["GET"])
+def get_sections():
+    project_id = request.args.get("project_id")
+    params = {}
+    if project_id:
+        params["project_id"] = project_id
+    resp = requests.get(
+        "https://api.todoist.com/rest/v2/sections",
+        headers=get_headers(),
+        params=params
+    )
+    if resp.status_code == 200:
+        return jsonify(resp.json()), 200
+    else:
+        return jsonify({
+            "error": "Failed to fetch sections",
+            "details": resp.text
+        }), resp.status_code
+
