@@ -65,11 +65,13 @@ def assign_labels():
     label_ids = data.get("label_ids")
     if not task_id or not isinstance(label_ids, list):
         return jsonify({"error": "task_id and label_ids (list) are required"}), 400
+
+    command_uuid = str(uuid.uuid4())
     payload = {
         "commands": [
             {
                 "type": "item_update",
-                "uuid": str(uuid.uuid4()),
+                "uuid": command_uuid,
                 "args": {
                     "id": task_id,
                     "label_ids": label_ids
@@ -77,5 +79,21 @@ def assign_labels():
             }
         ]
     }
+
     resp = requests.post("https://api.todoist.com/sync/v9/sync", json=payload, headers=get_headers())
-    return safe_json_response(resp)
+    try:
+        response_json = resp.json()
+    except Exception:
+        return jsonify({"error": "Invalid JSON from Todoist", "raw": resp.text}), resp.status_code
+
+    sync_status = response_json.get("sync_status", {})
+    command_status = sync_status.get(command_uuid, "unknown")
+
+    return jsonify({
+        "status_code": resp.status_code,
+        "task_id": task_id,
+        "label_ids": label_ids,
+        "command_uuid": command_uuid,
+        "sync_status": command_status,
+        "raw_response": response_json
+    }), resp.status_code
