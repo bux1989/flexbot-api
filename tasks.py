@@ -69,15 +69,18 @@ from datetime import datetime
 
 from datetime import datetime
 
+from datetime import datetime
+
 @tasks_bp.route("/list-tasks", methods=["GET"])
 def list_tasks():
-    # Get the section_id, label, and due_date from query parameters
+    # Get the section_id, label, due_date, and project_id from query parameters
     section_id = request.args.get('section_id')  # e.g., ?section_id=196256877
     label = request.args.get('label')  # e.g., ?label=infoboard-element
     due_date = request.args.get('due_date')  # e.g., ?due_date=today, ?due_date=2025-07-14
+    project_id = request.args.get('project_id')  # e.g., ?project_id=2356759847
 
-    # Set cache key based on section, label, and due date
-    cache_key = f"tasks_{section_id}_{label}_{due_date}" if section_id or label or due_date else "tasks"
+    # Set cache key based on section, label, due date, and project_id
+    cache_key = f"tasks_{section_id}_{label}_{due_date}_{project_id}" if section_id or label or due_date or project_id else "tasks"
     cached = cache_get(cache_key)
     if cached:
         return jsonify(cached)
@@ -109,9 +112,14 @@ def list_tasks():
             except ValueError:
                 return jsonify({"error": "Invalid due_date format. Use 'YYYY-MM-DD'."}), 400
 
+    # Filter tasks by project_id if provided
+    if project_id:
+        data = [task for task in data if task.get("project_id") == int(project_id)]
+
     # Cache the filtered results for 60 seconds
     cache_set(cache_key, data, ttl=60)
     return jsonify(data), response.status_code
+
 
 @tasks_bp.route("/create-recurring-task", methods=["POST"])
 def create_recurring_task():
