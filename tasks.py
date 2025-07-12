@@ -36,11 +36,13 @@ def edit_task():
     if not task_id:
         return jsonify({"error": "task_id required"}), 400
 
+    # Map input fields to Todoist v2 API fields
     valid_fields = {
         "title": "content",
         "description": "description",
         "priority": "priority",
-        "due_string": "due_string"
+        "due_string": "due_string",
+        "labels": "label_ids"
     }
 
     update_data = {
@@ -50,10 +52,10 @@ def edit_task():
     }
 
     if not update_data:
-        return jsonify({"error": "At least one updatable field required (title, description, priority, due_string)"}), 400
+        return jsonify({"error": "At least one updatable field required (title, description, priority, due_string, labels)"}), 400
 
-    response = requests.post(
-        f"https://api.todoist.com/rest/v1/tasks/{task_id}",
+    response = requests.patch(
+        f"https://api.todoist.com/rest/v2/tasks/{task_id}",
         json=update_data,
         headers=get_headers()
     )
