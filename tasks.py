@@ -89,21 +89,22 @@ def create_recurring_task():
 def move_task():
     data = request.get_json()
     task_id = data.get("task_id")
-    project_id = data.get("project_id")
-    section_id = data.get("section_id")
     if not task_id:
         return jsonify({"error": "task_id required"}), 400
 
     update_data = {}
-    if project_id:
-        update_data["project_id"] = project_id
-    if section_id:
-        update_data["section_id"] = section_id
+    for field in ["project_id", "section_id", "parent_id"]:
+        if data.get(field) is not None:
+            update_data[field] = data[field]
 
     if not update_data:
-        return jsonify({"error": "At least one of project_id or section_id must be provided"}), 400
+        return jsonify({"error": "At least one of project_id, section_id, or parent_id must be provided"}), 400
 
-    response = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=update_data, headers=get_headers())
+    response = requests.post(
+        f"https://api.todoist.com/rest/v2/tasks/{task_id}/move",
+        json=update_data,
+        headers=get_headers()
+    )
     return safe_json_response(response)
 
 @tasks_bp.route("/duplicate-task", methods=["POST"])
