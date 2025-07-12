@@ -1,5 +1,25 @@
+# edit_tasks.py
+from flask import Blueprint, request, jsonify
+from todoist_api_python.api import TodoistAPI
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Initialize the Todoist API
+api = TodoistAPI(os.getenv("TODOIST_API_TOKEN"))
+
+# Create a Blueprint for task editing
+edit_tasks_bp = Blueprint('edit_tasks', __name__)
+
+# Now you can use the Blueprint's route decorator
 @edit_tasks_bp.route("/edit-task", methods=["PATCH"])
 def edit_task():
+    """
+    Endpoint to edit a task's title and labels.
+    Expects JSON payload with `task_id`, `title`, and `labels`.
+    """
     data = request.get_json()
     print(data)  # Log the incoming request data
 
