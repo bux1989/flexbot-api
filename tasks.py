@@ -40,8 +40,7 @@ def edit_task():
         "title": "content",
         "description": "description",
         "priority": "priority",
-        "due_string": "due_string",
-        "labels": "label_ids"
+        "due_string": "due_string"
     }
 
     update_data = {
@@ -51,7 +50,7 @@ def edit_task():
     }
 
     if not update_data:
-        return jsonify({"error": "At least one updatable field required (title, description, priority, due_string, labels)"}), 400
+        return jsonify({"error": "At least one updatable field required (title, description, priority, due_string)"}), 400
 
     response = requests.post(
         f"https://api.todoist.com/rest/v1/tasks/{task_id}",
@@ -59,7 +58,7 @@ def edit_task():
         headers=get_headers()
     )
     return safe_json_response(response)
-
+    
 @tasks_bp.route("/complete-task", methods=["POST"])
 def complete_task():
     data = request.get_json()
