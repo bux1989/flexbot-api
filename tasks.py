@@ -15,8 +15,6 @@ def safe_json_response(response):
     else:
         return jsonify({"message": "No response content", "status_code": response.status_code}), response.status_code
 
-# ...[imports and helper code from your original script]...
-
 def get_label_ids(label_names):
     resp = requests.get("https://api.todoist.com/rest/v2/labels", headers=get_headers())
     if resp.status_code != 200:
@@ -49,48 +47,6 @@ def create_task():
     response = requests.post("https://api.todoist.com/rest/v2/tasks", json=task_data, headers=get_headers())
     return safe_json_response(response)
 
-@tasks_bp.route("/edit-task", methods=["POST", "PATCH"])
-def edit_task():
-    data = request.get_json()
-    task_id = data.get("task_id")
-    if not task_id:
-        return jsonify({"error": "task_id required"}), 400
-
-    update_data = {}
-    if data.get("title"):
-        update_data["content"] = data["title"]
-    if data.get("description"):
-        update_data["description"] = data["description"]
-    if data.get("priority"):
-        update_data["priority"] = data["priority"]
-    if data.get("due_string"):
-        update_data["due_string"] = data["due_string"]
-    # Support label names
-    if data.get("labels"):
-        label_ids, err = get_label_ids(data["labels"])
-        if err:
-            return jsonify({"error": err}), 400
-        update_data["label_ids"] = label_ids
-    elif data.get("label_ids"):
-        update_data["label_ids"] = data["label_ids"]
-
-    if not update_data:
-        return jsonify({"error": "At least one updatable field required (title, description, priority, due_string, labels)"}), 400
-
-    # PATCH request to Todoist API
-    response = requests.patch(
-        f"https://api.todoist.com/rest/v2/tasks/{task_id}",
-        json=update_data,
-        headers=get_headers()
-    )
-    return safe_json_response(response)
-
-# ----
-# All your other endpoints (recurring, move, complete, delete, list, duplicate, bulk-edit, etc.)
-# Can remain *exactly as you have them* unless you want to upgrade label handling in those as well.
-# ----
-
-    
 @tasks_bp.route("/complete-task", methods=["POST"])
 def complete_task():
     data = request.get_json()
@@ -243,46 +199,3 @@ def duplicate_task():
     new_task["content"] = f"Copy of: {orig_task['content']}"
     resp = requests.post("https://api.todoist.com/rest/v2/tasks", json=new_task, headers=get_headers())
     return safe_json_response(resp)
-
-@tasks_bp.route("/bulk-edit-tasks", methods=["POST"])
-def bulk_edit_tasks():
-    data = request.get_json()
-    task_ids = data.get("task_ids", [])
-    update_fields = data.get("fields", {})
-
-    valid_fields = {
-        "title": "content", "description": "description",
-        "labels": "label_ids", "priority": "priority",
-        "due_string": "due_string", "due_date": "due_date",
-        "due_datetime": "due_datetime", "due_lang": "due_lang",
-        "assignee_id": "assignee_id", "duration": "duration",
-        "duration_unit": "duration_unit", "deadline_date": "deadline_date",
-        "deadline_lang": "deadline_lang"
-    }
-    update_data = {
-        v: update_fields[k]
-        for k, v in valid_fields.items()
-        if update_fields.get(k) is not None
-    }
-    if not update_data:
-        return jsonify({"error": "No valid fields to update"}), 400
-
-    results = []
-    for task_id in task_ids:
-        resp = requests.post(
-            f"https://api.todoist.com/rest/v2/tasks/{task_id}",
-            json=update_data,
-            headers=get_headers()
-        )
-        result = None
-        if resp.content:
-            try:
-                result = resp.json()
-            except Exception:
-                result = {"message": resp.text or "No response content"}
-        results.append({
-            "task_id": task_id,
-            "result": result,
-            "status": resp.status_code
-        })
-    return jsonify(results)
