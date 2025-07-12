@@ -109,21 +109,29 @@ def move_task():
 
     if move_resp.status_code == 200:
         return safe_json_response(move_resp)
+
     elif move_resp.status_code == 404:
-        # Fallback: duplicate + delete
+        print("Move failed with 404 — attempting fallback (duplicate + delete)")
+
+        # Fallback: duplicate and delete
         orig_resp = requests.get(f"https://api.todoist.com/rest/v2/tasks/{task_id}", headers=get_headers())
         if orig_resp.status_code != 200:
             return jsonify({"error": "Original task not found for duplication fallback"}), 404
 
         orig_task = orig_resp.json()
+        print(f"Original task: {orig_task}")
+
+        due = orig_task.get("due") or {}
+
         new_task = {
             "content": orig_task.get("content"),
             "priority": orig_task.get("priority"),
-            "due_string": orig_task.get("due", {}).get("string"),
+            "due_string": due.get("string"),
             "project_id": update_data.get("project_id", orig_task.get("project_id")),
             "section_id": update_data.get("section_id", orig_task.get("section_id"))
         }
         new_task = {k: v for k, v in new_task.items() if v}
+        print(f"New task payload: {new_task}")
 
         create_resp = requests.post("https://api.todoist.com/rest/v2/tasks", json=new_task, headers=get_headers())
         if create_resp.status_code == 200:
@@ -134,6 +142,7 @@ def move_task():
             }), 200
         else:
             return jsonify({"error": "Fallback duplication failed", "details": create_resp.text}), create_resp.status_code
+
     else:
         return safe_json_response(move_resp)
 
