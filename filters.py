@@ -22,21 +22,34 @@ def get_tasks_by_filter():
         all_tasks = resp.json()
     except Exception:
         return jsonify({"error": "Failed to fetch tasks"}), resp.status_code
-    today = datetime.utcnow().date()
-    filtered = []
-    for task in all_tasks:
-        due = task.get("due", {}).get("date")
-        try:
-            due_date = datetime.fromisoformat(due).date() if due else None
-        except Exception:
-            continue
-        # Filter logic (expand as needed)
-        if filter_type == "today" and due_date == today:
-            filtered.append(task)
-        elif filter_type == "this_week" and due_date and (0 <= (due_date - today).days < 7):
-            filtered.append(task)
 
-    cache_set(cache_key, filtered, ttl=60)  # Cache result for 60 seconds
+    filtered = []
+
+    # If the filter is a label, filter tasks by label
+    if filter_type and filter_type.lower() != "today" and filter_type.lower() != "this_week":
+        for task in all_tasks:
+            labels = [lbl.lower() for lbl in task.get("labels", [])]  # Normalize label case
+            if filter_type.lower() in labels:
+                filtered.append(task)
+
+    # Otherwise, use the existing logic for date-based filters
+    else:
+        today = datetime.utcnow().date()
+        for task in all_tasks:
+            due = task.get("due", {}).get("date")
+            try:
+                due_date = datetime.fromisoformat(due).date() if due else None
+            except Exception:
+                continue
+
+            # Filter by date (today or this week)
+            if filter_type == "today" and due_date == today:
+                filtered.append(task)
+            elif filter_type == "this_week" and due_date and (0 <= (due_date - today).days < 7):
+                filtered.append(task)
+
+    # Cache the filtered results for 60 seconds
+    cache_set(cache_key, filtered, ttl=60)
     return jsonify(filtered)
 
 @filters_bp.route("/reschedule-by-label", methods=["POST"])
