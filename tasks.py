@@ -120,7 +120,6 @@ def list_tasks():
     cache_set(cache_key, data, ttl=60)
     return jsonify(data), response.status_code
 
-
 @tasks_bp.route("/create-recurring-task", methods=["POST"])
 def create_recurring_task():
     data = request.get_json()
