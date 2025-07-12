@@ -77,16 +77,27 @@ def list_tasks():
     section_id = request.args.get('section_id')  # e.g., ?section_id=196256877
     label = request.args.get('label')  # e.g., ?label=infoboard-element
     due_date = request.args.get('due_date')  # e.g., ?due_date=today, ?due_date=2025-07-14
-    project_id = request.args.get('project_id')  # e.g., ?project_id=2356759847
+    project_name = request.args.get('project')  # e.g., ?project=Test Project
+    filter_string = request.args.get('filter')  # e.g., ?filter=project:Test Project
 
-    # Set cache key based on section, label, due date, and project_id
-    cache_key = f"tasks_{section_id}_{label}_{due_date}_{project_id}" if section_id or label or due_date or project_id else "tasks"
+    # Set cache key based on section, label, due date, and filter_string
+    cache_key = f"tasks_{section_id}_{label}_{due_date}_{project_name}_{filter_string}" if section_id or label or due_date or project_name or filter_string else "tasks"
     cached = cache_get(cache_key)
     if cached:
         return jsonify(cached)
 
+    # Construct the Todoist API request URL
+    api_url = "https://api.todoist.com/rest/v2/tasks"
+    
+    # Prepare the query parameters
+    params = {}
+    if filter_string:
+        params['filter'] = filter_string  # Pass the filter string for Todoist's filtering
+    if project_name:
+        params['filter'] = f"project:{project_name}"  # Or use project name filtering
+    
     # Fetch tasks from Todoist
-    response = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers())
+    response = requests.get(api_url, headers=get_headers(), params=params)
     try:
         data = response.json()
     except Exception as e:
@@ -111,10 +122,6 @@ def list_tasks():
                 data = [task for task in data if task.get("due", {}).get("date") == due_date_parsed.isoformat()]
             except ValueError:
                 return jsonify({"error": "Invalid due_date format. Use 'YYYY-MM-DD'."}), 400
-
-    # Filter tasks by project_id if provided
-    if project_id:
-        data = [task for task in data if task.get("project_id") == int(project_id)]
 
     # Cache the filtered results for 60 seconds
     cache_set(cache_key, data, ttl=60)
