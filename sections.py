@@ -30,13 +30,17 @@ def edit_section():
     data = request.get_json()
     section_id = data.get("section_id")
     new_name = data.get("name")
-    if not section_id:
-        return jsonify({"error": "section_id required"}), 400
-    if not new_name:
-        return jsonify({"error": "name is required to update a section"}), 400
-    update_data = {"name": new_name}
-    resp = requests.post(f"https://api.todoist.com/rest/v2/sections/{section_id}", json=update_data, headers=get_headers())
-    return safe_json_response(resp)
+    if not section_id or not new_name:
+        return jsonify({"error": "section_id and name required"}), 400
+    resp = requests.post(
+        f"https://api.todoist.com/rest/v2/sections/{section_id}",
+        json={"name": new_name},
+        headers=get_headers()
+    )
+    if resp.status_code == 200:
+        return jsonify({"status": "updated"}), 200
+    else:
+        return jsonify({"error": "Failed to update section", "details": resp.text}), resp.status_code
 
 @sections_bp.route("/delete-section", methods=["POST"])
 def delete_section():
@@ -44,5 +48,11 @@ def delete_section():
     section_id = data.get("section_id")
     if not section_id:
         return jsonify({"error": "section_id required"}), 400
-    resp = requests.delete(f"https://api.todoist.com/rest/v2/sections/{section_id}", headers=get_headers())
-    return jsonify({"status": "deleted"}), resp.status_code
+    resp = requests.delete(
+        f"https://api.todoist.com/rest/v2/sections/{section_id}",
+        headers=get_headers()
+    )
+    if resp.status_code == 204:
+        return jsonify({"status": "deleted"}), 200
+    else:
+        return jsonify({"error": "Failed to delete section", "details": resp.text}), resp.status_code
