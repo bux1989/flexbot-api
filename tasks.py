@@ -23,9 +23,16 @@ def create_task():
         "priority": data.get("priority", 1),
         "due_string": data.get("due_string"),
         "project_id": data.get("project_id"),
-        "section_id": data.get("section_id")
+        "section_id": data.get("section_id"),
     }
-    task_data = {k: v for k, v in task_data.items() if v}
+    # Accept "labels" or "label_ids" as input, ensure ints
+    if data.get("labels"):
+        task_data["label_ids"] = [int(l) for l in data.get("labels")]
+    elif data.get("label_ids"):
+        task_data["label_ids"] = [int(l) for l in data.get("label_ids")]
+
+    # Remove keys with None or empty string
+    task_data = {k: v for k, v in task_data.items() if v is not None and v != ""}
     response = requests.post("https://api.todoist.com/rest/v2/tasks", json=task_data, headers=get_headers())
     return safe_json_response(response)
 
@@ -51,7 +58,6 @@ def edit_task():
         for field, api_field in valid_fields.items()
         if data.get(field) is not None
     }
-
 
     if not update_data:
         return jsonify({"error": "At least one updatable field required (title, description, priority, due_string, labels)"}), 400
@@ -228,4 +234,3 @@ def bulk_edit_tasks():
             "status": resp.status_code
         })
     return jsonify(results)
-
