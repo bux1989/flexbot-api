@@ -47,10 +47,11 @@ def edit_task():
     }
 
     update_data = {
-        api_field: data[field]
+        api_field: [int(l) for l in data[field]] if field == "labels" else data[field]
         for field, api_field in valid_fields.items()
         if data.get(field) is not None
     }
+
 
     if not update_data:
         return jsonify({"error": "At least one updatable field required (title, description, priority, due_string, labels)"}), 400
