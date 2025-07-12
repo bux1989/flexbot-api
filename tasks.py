@@ -15,6 +15,16 @@ def safe_json_response(response):
     else:
         return jsonify({"message": "No response content", "status_code": response.status_code}), response.status_code
 
+# ...[imports and helper code from your original script]...
+
+def get_label_ids(label_names):
+    resp = requests.get("https://api.todoist.com/rest/v2/labels", headers=get_headers())
+    if resp.status_code != 200:
+        return None, "Failed to fetch labels"
+    all_labels = resp.json()
+    name_to_id = {l["name"]: l["id"] for l in all_labels}
+    return [name_to_id[name] for name in label_names if name in name_to_id], None
+
 @tasks_bp.route("/create-task", methods=["POST"])
 def create_task():
     data = request.get_json()
@@ -25,11 +35,14 @@ def create_task():
         "project_id": data.get("project_id"),
         "section_id": data.get("section_id"),
     }
-    # Accept "labels" or "label_ids" as input, ensure ints
+    # Support label names
     if data.get("labels"):
-        task_data["label_ids"] = [int(l) for l in data.get("labels")]
+        label_ids, err = get_label_ids(data["labels"])
+        if err:
+            return jsonify({"error": err}), 400
+        task_data["label_ids"] = label_ids
     elif data.get("label_ids"):
-        task_data["label_ids"] = [int(l) for l in data.get("label_ids")]
+        task_data["label_ids"] = data.get("label_ids")
 
     # Remove keys with None or empty string
     task_data = {k: v for k, v in task_data.items() if v is not None and v != ""}
@@ -38,39 +51,45 @@ def create_task():
 
 @tasks_bp.route("/edit-task", methods=["POST"])
 def edit_task():
-    print("Edit-task hit! Method:", request.method)
     data = request.get_json()
-
     task_id = data.get("task_id")
     if not task_id:
         return jsonify({"error": "task_id required"}), 400
 
-    valid_fields = {
-        "title": "content",
-        "description": "description",
-        "priority": "priority",
-        "due_string": "due_string",
-        "labels": "label_ids"
-    }
-
-    update_data = {
-        api_field: [int(l) for l in data[field]] if field == "labels" else data[field]
-        for field, api_field in valid_fields.items()
-        if data.get(field) is not None
-    }
+    update_data = {}
+    if data.get("title"):
+        update_data["content"] = data["title"]
+    if data.get("description"):
+        update_data["description"] = data["description"]
+    if data.get("priority"):
+        update_data["priority"] = data["priority"]
+    if data.get("due_string"):
+        update_data["due_string"] = data["due_string"]
+    # Support label names
+    if data.get("labels"):
+        label_ids, err = get_label_ids(data["labels"])
+        if err:
+            return jsonify({"error": err}), 400
+        update_data["label_ids"] = label_ids
+    elif data.get("label_ids"):
+        update_data["label_ids"] = data["label_ids"]
 
     if not update_data:
         return jsonify({"error": "At least one updatable field required (title, description, priority, due_string, labels)"}), 400
 
-    print("Update data to Todoist:", update_data)
-
-    response = requests.post(
+    # PATCH request to Todoist API
+    response = requests.patch(
         f"https://api.todoist.com/rest/v2/tasks/{task_id}",
         json=update_data,
         headers=get_headers()
     )
-
     return safe_json_response(response)
+
+# ----
+# All your other endpoints (recurring, move, complete, delete, list, duplicate, bulk-edit, etc.)
+# Can remain *exactly as you have them* unless you want to upgrade label handling in those as well.
+# ----
+
     
 @tasks_bp.route("/complete-task", methods=["POST"])
 def complete_task():
