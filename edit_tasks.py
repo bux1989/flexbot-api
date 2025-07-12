@@ -1,3 +1,17 @@
+from flask import Blueprint, request, jsonify
+from todoist_api_python.api import TodoistAPI
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Initialize the Todoist API
+api = TodoistAPI(os.getenv("TODOIST_API_TOKEN"))
+
+# Create a Blueprint for task editing -- THIS MUST BE DEFINED BEFORE ROUTES
+edit_tasks_bp = Blueprint('edit_tasks', __name__)
+
 @edit_tasks_bp.route("/edit-task", methods=["PATCH"])
 def edit_task():
     print("Received PATCH request to /edit-task")
