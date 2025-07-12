@@ -94,14 +94,51 @@ def delete_task():
     response = requests.delete(f"https://api.todoist.com/rest/v2/tasks/{task_id}", headers=get_headers())
     return safe_json_response(response)
 
+from datetime import datetime
+
 @tasks_bp.route("/list-tasks", methods=["GET"])
 def list_tasks():
-    cache_key = "tasks"
+    # Get the section_id, label, and due_date from query parameters
+    section_id = request.args.get('section_id')  # e.g., ?section_id=196256877
+    label = request.args.get('label')  # e.g., ?label=infoboard-element
+    due_date = request.args.get('due_date')  # e.g., ?due_date=today, ?due_date=2025-07-14
+
+    # Set cache key based on section, label, and due date
+    cache_key = f"tasks_{section_id}_{label}_{due_date}" if section_id or label or due_date else "tasks"
     cached = cache_get(cache_key)
     if cached:
         return jsonify(cached)
+
+    # Fetch tasks from Todoist
     response = requests.get("https://api.todoist.com/rest/v2/tasks", headers=get_headers())
-    data = response.json()
+    try:
+        data = response.json()
+    except Exception as e:
+        return jsonify({"error": "Failed to fetch tasks"}), response.status_code
+
+    # Filter tasks by section_id if provided
+    if section_id:
+        data = [task for task in data if task.get("section_id") == section_id]
+    
+    # Filter tasks by label if provided
+    if label:
+        data = [task for task in data if label.lower() in [lbl.lower() for lbl in task.get("labels", [])]]
+    
+    # Filter tasks by due date if provided
+    if due_date:
+        # Normalize the due date (e.g., 'today' or specific date 'YYYY-MM-DD')
+        today = datetime.utcnow().date()
+        if due_date.lower() == "today":
+            data = [task for task in data if task.get("due", {}).get("date") == today.isoformat()]
+        else:
+            try:
+                # If the due_date is a specific date, compare it
+                due_date_parsed = datetime.strptime(due_date, "%Y-%m-%d").date()
+                data = [task for task in data if task.get("due", {}).get("date") == due_date_parsed.isoformat()]
+            except ValueError:
+                return jsonify({"error": "Invalid due_date format. Use 'YYYY-MM-DD'."}), 400
+
+    # Cache the filtered results for 60 seconds
     cache_set(cache_key, data, ttl=60)
     return jsonify(data), response.status_code
 
