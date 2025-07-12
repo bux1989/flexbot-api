@@ -36,15 +36,39 @@ def edit_task():
     if not task_id:
         return jsonify({"error": "task_id required"}), 400
 
-    # Only allow valid update fields for Todoist tasks
-    valid_fields = {"title": "content", "priority": "priority", "due_string": "due_string"}
-    update_data = {api_field: data[field] for field, api_field in valid_fields.items() if data.get(field) is not None}
+    # Full list of editable fields based on Todoist API
+    valid_fields = {
+        "title": "content",
+        "description": "description",
+        "labels": "label_ids",
+        "priority": "priority",
+        "due_string": "due_string",
+        "due_date": "due_date",
+        "due_datetime": "due_datetime",
+        "due_lang": "due_lang",
+        "assignee_id": "assignee_id",
+        "duration": "duration",
+        "duration_unit": "duration_unit",
+        "deadline_date": "deadline_date",
+        "deadline_lang": "deadline_lang"
+    }
+
+    update_data = {
+        api_field: data[field]
+        for field, api_field in valid_fields.items()
+        if data.get(field) is not None
+    }
 
     if not update_data:
-        return jsonify({"error": "At least one updatable field required (title, priority, due_string)"}), 400
+        return jsonify({"error": "At least one valid field is required"}), 400
 
-    response = requests.post(f"https://api.todoist.com/rest/v2/tasks/{task_id}", json=update_data, headers=get_headers())
+    response = requests.post(
+        f"https://api.todoist.com/rest/v2/tasks/{task_id}",
+        json=update_data,
+        headers=get_headers()
+    )
     return safe_json_response(response)
+
 
 @tasks_bp.route("/complete-task", methods=["POST"])
 def complete_task():
