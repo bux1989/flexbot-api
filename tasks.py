@@ -28,12 +28,26 @@ def create_task():
     data = request.get_json()
     task_data = {
         "content": data.get("title"),
+        "description": data.get("description"),
         "priority": data.get("priority", 1),
         "due_string": data.get("due_string"),
+        "due_lang": data.get("due_lang"),
+        "due_date": data.get("due_date"),
+        "due_datetime": data.get("due_datetime"),
         "project_id": data.get("project_id"),
         "section_id": data.get("section_id"),
+        "parent_id": data.get("parent_id"),
+        "assignee_id": data.get("assignee_id"),
+        "order": data.get("order"),
+        "auto_reminder": data.get("auto_reminder"),
+        "auto_parse_labels": data.get("auto_parse_labels"),
+        "duration": data.get("duration"),
+        "duration_unit": data.get("duration_unit"),
+        "deadline_date": data.get("deadline_date"),
+        "deadline_lang": data.get("deadline_lang"),
     }
-    # Support label names
+
+    # Support label names or label IDs
     if data.get("labels"):
         label_ids, err = get_label_ids(data["labels"])
         if err:
@@ -44,7 +58,12 @@ def create_task():
 
     # Remove keys with None or empty string
     task_data = {k: v for k, v in task_data.items() if v is not None and v != ""}
-    response = requests.post("https://api.todoist.com/rest/v2/tasks", json=task_data, headers=get_headers())
+
+    response = requests.post(
+        "https://api.todoist.com/rest/v2/tasks",
+        json=task_data,
+        headers=get_headers(),
+    )
     return safe_json_response(response)
 
 @tasks_bp.route("/complete-task", methods=["POST"])
