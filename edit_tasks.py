@@ -81,7 +81,7 @@ def edit_task():
         task = api.update_task(**kwargs)
         print(f"api.update_task returned: {task}")
 
-        responses = {"task": task.to_dict() if hasattr(task, 'to_dict') else vars(task)}
+        responses = {"task": task if isinstance(task, dict) else task.to_dict() if hasattr(task, 'to_dict') else vars(task)}
 
         # Add a comment if requested
         if comment:
