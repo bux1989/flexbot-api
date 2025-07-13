@@ -46,8 +46,7 @@ def create_task():
         "deadline_date": data.get("deadline_date"),
         "deadline_lang": data.get("deadline_lang"),
     }
-
-    # Support label names or label IDs
+    # Handle label names or IDs
     if data.get("labels"):
         label_ids, err = get_label_ids(data["labels"])
         if err:
